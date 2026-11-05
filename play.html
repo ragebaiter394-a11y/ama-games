@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<title>Catur</title>
+<style>
+:root{
+  --bg:#0f1216;--surface:#171b21;--surface2:#1e232b;--line:#2a313b;--text:#e8ecf1;--muted:#8d97a5;
+  --accent:#3dbd91;--accent-ink:#06261c;--danger:#e5675b;--warn:#e0b34a;
+  --sq-l:#e8dcc3;--sq-d:#9a7b59;--hl:rgba(236,196,64,.5);--sel:rgba(61,189,145,.55);--chk:rgba(229,103,91,.75);
+  --r:14px;--font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font)}
+body{min-height:100vh;min-height:100dvh}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{max-width:1040px;margin:0 auto;padding:10px 12px calc(14px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;gap:10px;padding:4px 2px 10px}
+.brand{font-weight:700;letter-spacing:.2px}
+.brand small{font-weight:500;color:var(--muted);margin-left:6px}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--accent);box-shadow:0 0 0 3px rgba(61,189,145,.18)}.dot.bad{background:var(--danger)}
+.pill b{color:var(--text);font-weight:600}
+.layout{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:900px){.layout{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.boardcard{padding:10px}
+.player{display:flex;align-items:center;gap:10px;padding:6px 4px;min-height:48px}
+.avatar{width:34px;height:34px;border-radius:9px;background:var(--surface2);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:14px}
+.avatar.w{background:#efe9dc;color:#1c1a16;border-color:#efe9dc}.avatar.b{background:#25282d;color:#eee;border-color:#3a3f47}
+.pname{font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmeta{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;min-height:16px}
+.cap{display:inline-flex;align-items:center;height:16px}
+.cap svg{width:16px;height:16px;margin-right:-5px}
+.clk{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;padding:5px 10px;border-radius:9px;background:var(--surface2);border:1px solid var(--line);min-width:64px;text-align:center}
+.clk.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.clk.low{background:var(--danger);border-color:var(--danger);color:#fff}
+.turn{margin-left:8px;font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.turn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.boardwrap{width:100%;max-width:560px;margin:4px auto}
+.board{position:relative;width:100%;aspect-ratio:1/1;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:8px;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.sq{position:relative;display:grid;place-items:center;background:var(--sq-l)}
+.sq.d{background:var(--sq-d)}
+.sq.last::before,.sq.sel::before,.sq.chk::before{content:"";position:absolute;inset:0}
+.sq.last::before{background:var(--hl)}.sq.sel::before{background:var(--sel)}.sq.chk::before{background:radial-gradient(circle,var(--chk) 0,rgba(229,103,91,0) 75%)}
+.sq svg.pc-wrap{position:relative;width:92%;height:92%;pointer-events:none}
+.pc{stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.pc.w{fill:#f6f1e7;stroke:#2b2118;--cut:#2b2118;--eye:#2b2118}.pc.b{fill:#35322f;stroke:#0f0d0b;--cut:#d9d3c8;--eye:#d9d3c8}
+.cut{fill:none;stroke:var(--cut)}.eye{fill:var(--eye);stroke:none}
+.sq .dotm{position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(18,18,18,.28);pointer-events:none}
+.sq .ring{position:absolute;inset:4%;border-radius:50%;border:4px solid rgba(18,18,18,.28);pointer-events:none}
+.sq .co{position:absolute;font-size:10.5px;font-weight:700;line-height:1;pointer-events:none;opacity:.8}
+.sq .co.f{right:4px;bottom:3px}.sq .co.r{left:4px;top:3px}
+.sq:not(.d) .co{color:var(--sq-d)}.sq.d .co{color:var(--sq-l)}
+@keyframes land{from{transform:scale(1.12)}to{transform:scale(1)}}
+.sq.last svg.pc-wrap{animation:land .18s ease-out}
+@media(prefers-reduced-motion:reduce){.sq.last svg.pc-wrap{animation:none}}
+.status{display:flex;align-items:center;gap:8px;padding:8px 4px 2px;min-height:38px;color:var(--muted);font-size:13.5px}
+.status strong{color:var(--text)}
+.actions{display:flex;gap:8px;padding:8px 2px 0}
+.btn{flex:1;min-height:44px;padding:0 14px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);font-weight:600}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.45;cursor:default}
+.side{display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;padding:4px;gap:4px;border-bottom:1px solid var(--line)}
+.tab{flex:1;min-height:38px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:600}
+.tab[aria-selected=true]{background:var(--surface2);color:var(--text)}
+@media(min-width:900px){.tabs{display:none}.panel{display:block!important}.panel+.panel{border-top:1px solid var(--line)}}
+.panel{display:none;padding:10px 12px}
+.panel.on{display:block}
+.ptitle{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600}
+@media(max-width:899px){.ptitle{display:none}}
+.moves{max-height:210px;overflow:auto;font-variant-numeric:tabular-nums}
+@media(min-width:900px){.moves{max-height:240px}}
+.mv{display:grid;grid-template-columns:34px 1fr 1fr;gap:4px;padding:3px 4px;border-radius:7px;font-size:14px}
+.mv:nth-child(odd){background:rgba(255,255,255,.025)}
+.mv .n{color:var(--muted)}.mv .cur{color:var(--accent);font-weight:700}
+.empty{color:var(--muted);font-size:13.5px;padding:6px 2px}
+.chat{display:flex;flex-direction:column;height:260px}
+@media(min-width:900px){.chat{height:300px}}
+.msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:7px;padding-right:2px}
+.msg{font-size:14px;word-break:break-word}.msg b{font-weight:600;margin-right:6px}.msg time{color:var(--muted);font-size:11.5px;margin-left:6px}
+.msg.me b{color:var(--accent)}
+.chatform{display:flex;gap:8px;margin-top:8px}
+input[type=text],input[type=tel]{width:100%;min-height:44px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);color:var(--text);padding:0 12px;font:inherit;outline:none}
+input:focus{border-color:var(--accent)}
+.chatform .btn{flex:0 0 auto;min-width:72px}
+.overlay{position:fixed;inset:0;background:rgba(7,9,12,.72);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.overlay.on{display:flex}
+.modal{width:100%;max-width:400px;padding:20px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal h2{margin:0 0 4px;font-size:19px}
+.modal p{margin:0 0 14px;color:var(--muted);font-size:14px}
+.vs{display:flex;align-items:center;justify-content:center;gap:10px;margin:2px 0 16px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--line);font-weight:600}
+.vs span.v{color:var(--muted);font-weight:500;font-size:12px}
+label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 5px;font-weight:600}
+.row{display:flex;gap:8px;margin-top:14px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:10px}
+.err{color:var(--danger);font-size:13px;margin-top:8px;min-height:18px}
+.promo{display:flex;gap:8px;margin-top:6px}
+.promo button{flex:1;aspect-ratio:1;border-radius:12px;border:1px solid var(--line);background:var(--sq-l);padding:6px}
+.promo button svg{width:100%;height:100%}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;background:var(--surface2);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;transition:.22s;z-index:30;max-width:92vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.result{margin:6px 0 0;padding:12px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--line)}
+.result h3{margin:0 0 2px;font-size:16px}.result p{margin:0;color:var(--muted);font-size:13.5px}
+.credit{margin-top:14px;text-align:center;color:#59626f;font-size:12px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><defs><g id="pc-p"><circle cx="22.5" cy="13.5" r="5.6"/><path d="M16.2 35c.2-6 2.4-9.6 6.3-12.4 3.9 2.8 6.1 6.4 6.3 12.4z"/><path d="M12.5 35.5h20c1 0 1.8.8 1.8 1.8v.4c0 1-.8 1.8-1.8 1.8h-20c-1 0-1.8-.8-1.8-1.8v-.4c0-1 .8-1.8 1.8-1.8z"/></g><g id="pc-r"><path d="M12 11h4.2v3.2h3.6V11h5.4v3.2h3.6V11H33v9.4l-3 2.6H15l-3-2.6z"/><path d="M15 23h15l1.2 12.5H13.8z"/><path d="M11 35.5h23c1 0 1.8.8 1.8 1.8v.4c0 1-.8 1.8-1.8 1.8H11c-1 0-1.8-.8-1.8-1.8v-.4c0-1 .8-1.8 1.8-1.8z"/></g><g id="pc-n"><path d="M13.5 36c.2-5.2 1.8-8.6 5.4-11.6l-6.1 1.7c-1.1-1.5-1.2-3 .1-4.5l6.1-6.8-1-3.8 3.6 1.6c1.5-1.9 3.4-3 5.7-3.2 6.7.5 11.2 6.5 11.2 14.7 0 4.6-.6 8.3-1.2 12z"/><circle cx="21.4" cy="16.6" r="1.1" class="eye"/><path d="M11 36h22.5c1 0 1.8.8 1.8 1.8v.2c0 1-.8 1.8-1.8 1.8H11c-1 0-1.8-.8-1.8-1.8v-.2c0-1 .8-1.8 1.8-1.8z"/></g><g id="pc-b"><circle cx="22.5" cy="7.8" r="2.4"/><path d="M22.5 10.2c-4.6 3.2-7.7 6.8-7.7 11 0 2.5 1.2 4.4 3.1 5.6h9.2c1.9-1.2 3.1-3.1 3.1-5.6 0-4.2-3.1-7.8-7.7-11z"/><path d="M16.8 27.4h11.4l1 8.1H15.8z"/><path d="M11.5 35.5h22c1 0 1.8.8 1.8 1.8v.4c0 1-.8 1.8-1.8 1.8h-22c-1 0-1.8-.8-1.8-1.8v-.4c0-1 .8-1.8 1.8-1.8z"/><path class="cut" d="M22.5 14.4v5M20 16.9h5"/></g><g id="pc-q"><circle cx="9" cy="12.5" r="2.3"/><circle cx="15.8" cy="9.3" r="2.3"/><circle cx="22.5" cy="8.2" r="2.3"/><circle cx="29.2" cy="9.3" r="2.3"/><circle cx="36" cy="12.5" r="2.3"/><path d="M9 14.6l4.6 14.6h17.8L36 14.6l-6.6 8-1.8-10.4-3.2 9.6-1.9-10-1.9 10-3.2-9.6-1.8 10.4z"/><path d="M13.2 29.2h18.6l1 6.3H12.2z"/><path d="M11 35.5h23c1 0 1.8.8 1.8 1.8v.4c0 1-.8 1.8-1.8 1.8H11c-1 0-1.8-.8-1.8-1.8v-.4c0-1 .8-1.8 1.8-1.8z"/></g><g id="pc-k"><path d="M21 3.8h3V7h3.2v3H24v3.2h-3V10h-3.2V7H21z"/><path d="M22.5 14c-6.3 0-11.2 4-11.2 10.2 0 4.2 1.7 7.4 2.5 11.3h17.4c.8-3.9 2.5-7.1 2.5-11.3C33.7 18 28.8 14 22.5 14z"/><path d="M11 35.5h23c1 0 1.8.8 1.8 1.8v.4c0 1-.8 1.8-1.8 1.8H11c-1 0-1.8-.8-1.8-1.8v-.4c0-1 .8-1.8 1.8-1.8z"/></g></defs></svg>
+<div class="app">
+  <div class="top">
+    <div class="brand">Catur<small>AMA HGC</small></div>
+    <div class="sp"></div>
+    <div class="pill" id="roleP"><span>—</span></div>
+    <div class="pill"><span class="dot" id="conn"></span><span id="connT">menyambung</span></div>
+  </div>
+
+  <div class="layout">
+    <section class="card boardcard">
+      <div class="player" id="topP"></div>
+      <div class="boardwrap"><div class="board" id="board" role="grid" aria-label="Papan catur"></div></div>
+      <div class="player" id="botP"></div>
+      <div class="status" id="status"></div>
+      <div id="resultBox"></div>
+      <div class="actions hidden" id="actions">
+        <button class="btn" id="drawBtn">Tawarkan remis</button>
+        <button class="btn danger" id="resignBtn">Menyerah</button>
+      </div>
+    </section>
+
+    <aside class="card side">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabMoves" aria-selected="true">Langkah</button>
+        <button class="tab" role="tab" id="tabChat" aria-selected="false">Chat</button>
+      </div>
+      <div class="panel on" id="pMoves">
+        <h3 class="ptitle">Langkah</h3>
+        <div class="moves" id="moves"></div>
+      </div>
+      <div class="panel" id="pChat">
+        <h3 class="ptitle">Chat</h3>
+        <div class="chat">
+          <div class="msgs" id="msgs"></div>
+          <form class="chatform" id="chatForm" autocomplete="off">
+            <input type="text" id="chatIn" maxlength="200" placeholder="Tulis pesan…" aria-label="Pesan">
+            <button class="btn primary" type="submit">Kirim</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  </div>
+  <div class="credit">Catur 10 menit · sesi sementara, dihapus otomatis setelah game selesai</div>
+</div>
+
+<div class="overlay" id="joinOv">
+  <form class="modal" id="joinForm" autocomplete="off">
+    <h2>Masuk ke game</h2>
+    <p>Pemain masuk dengan nomor WhatsApp yang ditantang. Selain itu bisa menonton.</p>
+    <div class="vs"><span id="vsA">—</span><span class="v">vs</span><span id="vsB">—</span></div>
+    <label for="num">Nomor WhatsApp</label>
+    <input type="tel" id="num" inputmode="tel" placeholder="08xxxxxxxxxx" maxlength="20">
+    <label for="nick">Nama panggilan (untuk chat)</label>
+    <input type="text" id="nick" maxlength="24" placeholder="Opsional">
+    <div class="err" id="joinErr"></div>
+    <div class="row">
+      <button type="button" class="btn" id="watchBtn">Tonton saja</button>
+      <button type="submit" class="btn primary" id="joinBtn">Masuk</button>
+    </div>
+  </form>
+</div>
+
+<div class="overlay" id="promoOv">
+  <div class="modal"><h2>Promosi pion</h2><p>Pilih bidak pengganti.</p><div class="promo" id="promoRow"></div></div>
+</div>
+
+<div class="overlay" id="confirmOv">
+  <div class="modal"><h2 id="cfTitle"></h2><p id="cfText"></p>
+    <div class="row"><button class="btn" id="cfNo">Batal</button><button class="btn primary" id="cfYes">Ya</button></div></div>
+</div>
+
+<div class="overlay" id="endOv">
+  <div class="modal"><h2>Sesi sudah ditutup</h2><p>Game ini sudah selesai atau tautannya tidak berlaku lagi. Minta tantangan baru lewat bot.</p></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const E = (() => {
+// Mesin catur ringkas (tanpa dependensi): aturan lengkap (rokade, en passant, promosi),
+// deteksi skak/skakmat/stalemate, dan AI sederhana (alpha-beta).
+// Papan: index = rank*8 + file, rank 0 = baris 1 (putih di bawah), file 0 = kolom a.
+
+const START = "RNBQKBNRPPPPPPPP................................pppppppprnbqkbnr";
+const KN = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
+const KG = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+const DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+const isWhite = (p) => p >= "A" && p <= "Z";
+const colorOf = (p) => (p === "." ? null : isWhite(p) ? "w" : "b");
+const rk = (s) => s >> 3;
+const fl = (s) => s & 7;
+const inb = (r, f) => r >= 0 && r < 8 && f >= 0 && f < 8;
+
+const sqName = (s) => "abcdefgh"[fl(s)] + (rk(s) + 1);
+
+function newGame() {
+	return { b: START.split(""), turn: "w", c: { K: true, Q: true, k: true, q: true }, ep: -1, half: 0, full: 1 };
+}
+
+function fromFen(fen) {
+	const [pos, turn, cast, ep, half, full] = fen.split(" ");
+	const b = Array(64).fill(".");
+	pos.split("/").forEach((row, i) => {
+		let f = 0;
+		for (const ch of row) {
+			if (/\d/.test(ch)) f += Number(ch);
+			else b[(7 - i) * 8 + f++] = ch;
+		}
+	});
+	return {
+		b, turn, c: { K: cast.includes("K"), Q: cast.includes("Q"), k: cast.includes("k"), q: cast.includes("q") },
+		ep: ep === "-" ? -1 : "abcdefgh".indexOf(ep[0]) + (Number(ep[1]) - 1) * 8, half: Number(half || 0), full: Number(full || 1),
+	};
+}
+
+function attacked(st, sq, by) {
+	const b = st.b;
+	const r = rk(sq), f = fl(sq);
+	const pawn = by === "w" ? "P" : "p";
+	const pr = by === "w" ? r - 1 : r + 1;
+	for (const df of [-1, 1]) if (inb(pr, f + df) && b[pr * 8 + f + df] === pawn) return true;
+	const kn = by === "w" ? "N" : "n", kg = by === "w" ? "K" : "k";
+	for (const [dr, df] of KN) if (inb(r + dr, f + df) && b[(r + dr) * 8 + f + df] === kn) return true;
+	for (const [dr, df] of KG) if (inb(r + dr, f + df) && b[(r + dr) * 8 + f + df] === kg) return true;
+	const q = by === "w" ? "Q" : "q", ro = by === "w" ? "R" : "r", bi = by === "w" ? "B" : "b";
+	for (const [dr, df] of ORTH) {
+		for (let rr = r + dr, ff = f + df; inb(rr, ff); rr += dr, ff += df) {
+			const p = b[rr * 8 + ff];
+			if (p === ".") continue;
+			if (p === q || p === ro) return true;
+			break;
+		}
+	}
+	for (const [dr, df] of DIAG) {
+		for (let rr = r + dr, ff = f + df; inb(rr, ff); rr += dr, ff += df) {
+			const p = b[rr * 8 + ff];
+			if (p === ".") continue;
+			if (p === q || p === bi) return true;
+			break;
+		}
+	}
+	return false;
+}
+
+const kingSq = (st, color) => st.b.indexOf(color === "w" ? "K" : "k");
+const inCheck = (st, color = st.turn) => attacked(st, kingSq(st, color), color === "w" ? "b" : "w");
+
+function pseudo(st) {
+	const out = [];
+	const { b, turn } = st;
+	const me = turn, enemy = turn === "w" ? "b" : "w";
+	for (let s = 0; s < 64; s++) {
+		const p = b[s];
+		if (p === "." || colorOf(p) !== me) continue;
+		const r = rk(s), f = fl(s);
+		const t = p.toLowerCase();
+		if (t === "p") {
+			const dir = me === "w" ? 1 : -1, start = me === "w" ? 1 : 6, last = me === "w" ? 7 : 0;
+			const push = (to, extra = {}) => {
+				if (rk(to) === last) for (const pr of ["q", "r", "b", "n"]) out.push({ from: s, to, promo: pr, ...extra });
+				else out.push({ from: s, to, ...extra });
+			};
+			const r1 = r + dir;
+			if (inb(r1, f) && b[r1 * 8 + f] === ".") {
+				push(r1 * 8 + f);
+				if (r === start && b[(r + 2 * dir) * 8 + f] === ".") out.push({ from: s, to: (r + 2 * dir) * 8 + f, dbl: true });
+			}
+			for (const df of [-1, 1]) {
+				if (!inb(r1, f + df)) continue;
+				const to = r1 * 8 + f + df;
+				if (b[to] !== "." && colorOf(b[to]) === enemy) push(to);
+				else if (to === st.ep) out.push({ from: s, to, ep: true });
+			}
+		} else if (t === "n" || t === "k") {
+			for (const [dr, df] of t === "n" ? KN : KG) {
+				if (!inb(r + dr, f + df)) continue;
+				const to = (r + dr) * 8 + f + df;
+				if (b[to] === "." || colorOf(b[to]) === enemy) out.push({ from: s, to });
+			}
+			if (t === "k") {
+				const home = me === "w" ? 4 : 60;
+				if (s === home && !attacked(st, s, enemy)) {
+					const K = me === "w" ? "K" : "k", Q = me === "w" ? "Q" : "q", R = me === "w" ? "R" : "r";
+					if (st.c[K] && b[home + 1] === "." && b[home + 2] === "." && b[home + 3] === R && !attacked(st, home + 1, enemy) && !attacked(st, home + 2, enemy)) out.push({ from: s, to: home + 2, castle: "K" });
+					if (st.c[Q] && b[home - 1] === "." && b[home - 2] === "." && b[home - 3] === "." && b[home - 4] === R && !attacked(st, home - 1, enemy) && !attacked(st, home - 2, enemy)) out.push({ from: s, to: home - 2, castle: "Q" });
+				}
+			}
+		} else {
+			const dirs = t === "b" ? DIAG : t === "r" ? ORTH : [...DIAG, ...ORTH];
+			for (const [dr, df] of dirs) {
+				for (let rr = r + dr, ff = f + df; inb(rr, ff); rr += dr, ff += df) {
+					const to = rr * 8 + ff;
+					if (b[to] === ".") out.push({ from: s, to });
+					else {
+						if (colorOf(b[to]) === enemy) out.push({ from: s, to });
+						break;
+					}
+				}
+			}
+		}
+	}
+	return out;
+}
+
+function apply(st, mv) {
+	const b = st.b.slice();
+	const p = b[mv.from];
+	const me = st.turn;
+	const captured = mv.ep ? b[mv.to + (me === "w" ? -8 : 8)] : b[mv.to];
+	b[mv.from] = ".";
+	b[mv.to] = mv.promo ? (me === "w" ? mv.promo.toUpperCase() : mv.promo) : p;
+	if (mv.ep) b[mv.to + (me === "w" ? -8 : 8)] = ".";
+	if (mv.castle === "K") { b[mv.to - 1] = b[mv.to + 1]; b[mv.to + 1] = "."; }
+	if (mv.castle === "Q") { b[mv.to + 1] = b[mv.to - 2]; b[mv.to - 2] = "."; }
+	const c = { ...st.c };
+	if (p === "K") { c.K = false; c.Q = false; }
+	if (p === "k") { c.k = false; c.q = false; }
+	for (const s of [mv.from, mv.to]) {
+		if (s === 0) c.Q = false;
+		if (s === 7) c.K = false;
+		if (s === 56) c.q = false;
+		if (s === 63) c.k = false;
+	}
+	return {
+		b, turn: me === "w" ? "b" : "w", c,
+		ep: mv.dbl ? (mv.from + mv.to) / 2 : -1,
+		half: p.toLowerCase() === "p" || captured !== "." ? 0 : st.half + 1,
+		full: st.full + (me === "b" ? 1 : 0),
+	};
+}
+
+function legalMoves(st) {
+	const me = st.turn;
+	return pseudo(st).filter((m) => !inCheck(apply(st, m), me));
+}
+
+function status(st) {
+	const moves = legalMoves(st);
+	if (!moves.length) return inCheck(st) ? "checkmate" : "stalemate";
+	if (st.half >= 100) return "draw50";
+	const pcs = st.b.filter((p) => p !== "." && p.toLowerCase() !== "k");
+	if (!pcs.length) return "insufficient";
+	if (pcs.length === 1 && "nb".includes(pcs[0].toLowerCase())) return "insufficient";
+	return inCheck(st) ? "check" : "ok";
+}
+
+// Cari langkah legal dari (from -> to); promosi otomatis jadi ratu kecuali ditentukan.
+function findMove(st, from, to, promo = "q") {
+	return legalMoves(st).find((m) => m.from === from && m.to === to && (!m.promo || m.promo === promo)) || null;
+}
+
+function perft(st, depth) {
+	if (depth === 0) return 1;
+	let n = 0;
+	for (const m of legalMoves(st)) n += depth === 1 ? 1 : perft(apply(st, m), depth - 1);
+	return n;
+}
+
+// --- AI ---
+const VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+const CENTER = (s) => 3.5 - Math.abs(3.5 - fl(s)) + (3.5 - Math.abs(3.5 - rk(s)));
+
+function evaluate(st) {
+	let score = 0;
+	for (let s = 0; s < 64; s++) {
+		const p = st.b[s];
+		if (p === ".") continue;
+		const t = p.toLowerCase();
+		let v = VAL[t];
+		if (t === "p") v += (isWhite(p) ? rk(s) : 7 - rk(s)) * 6 + CENTER(s) * 2;
+		else if (t === "n" || t === "b") v += CENTER(s) * 6;
+		score += isWhite(p) ? v : -v;
+	}
+	return score;
+}
+
+function ordered(st, moves) {
+	return moves
+		.map((m) => {
+			const cap = m.ep ? "p" : st.b[m.to].toLowerCase();
+			return { m, k: (cap !== "." ? 10 * VAL[cap] - VAL[st.b[m.from].toLowerCase()] : 0) + (m.promo === "q" ? 800 : 0) };
+		})
+		.sort((a, b) => b.k - a.k)
+		.map((x) => x.m);
+}
+
+function search(st, depth, alpha, beta, ctx) {
+	if (++ctx.nodes > ctx.limit) return evaluate(st) * (st.turn === "w" ? 1 : -1);
+	const moves = legalMoves(st);
+	if (!moves.length) return inCheck(st) ? -100000 - depth : 0;
+	if (depth === 0) return evaluate(st) * (st.turn === "w" ? 1 : -1);
+	for (const m of ordered(st, moves)) {
+		const sc = -search(apply(st, m), depth - 1, -beta, -alpha, ctx);
+		if (sc >= beta) return beta;
+		if (sc > alpha) alpha = sc;
+	}
+	return alpha;
+}
+
+// level: 1 (acak berbobot), 2 (kedalaman 2), 3 (kedalaman 3)
+function bestMove(st, level = 2) {
+	const moves = ordered(st, legalMoves(st));
+	if (!moves.length) return null;
+	const depth = Math.max(1, level - 0);
+	const ctx = { nodes: 0, limit: 60000 };
+	let best = [], bestScore = -Infinity;
+	for (const m of moves) {
+		const sc = -search(apply(st, m), depth - 1, -Infinity, Infinity, ctx);
+		if (sc > bestScore + 5) { bestScore = sc; best = [m]; }
+		else if (Math.abs(sc - bestScore) <= 5) best.push(m);
+	}
+	return best[Math.floor(Math.random() * best.length)] || moves[0];
+}
+
+return { legalMoves, apply, status, inCheck, sqName };
+})();
+
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const SID = qs.get("s") || "";
+const DB = (qs.get("db") || "").replace(/\/+$/, "");
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const dev = (() => {
+  let d = store.get("chess_dev");
+  if (!d) { d = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/[^\w-]/g, ""); store.set("chess_dev", d); }
+  return d;
+})();
+
+// ID khusus chat (acak, terpisah dari dev). dev adalah kunci kursi dan TIDAK BOLEH pernah ditulis ke data yang bisa dibaca orang lain.
+const cid = (() => {
+  let d = store.get("chess_cid");
+  if (!d) { d = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); store.set("chess_cid", d); }
+  return d;
+})();
+
+const S = { pub: null, role: null, nick: "", closed: false, selected: -1, legal: [], pending: false, lastN: -1, seen: false };
+const PIECE_ORDER = { q: 0, r: 1, b: 2, n: 3, p: 4 };
+const VAL = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const RESULT_TXT = { time: "Waktu habis", checkmate: "Skakmat", stalemate: "Stalemate", draw50: "Seri — aturan 50 langkah", insufficient: "Seri — materi tidak cukup", resign: "Menyerah", agreed: "Seri — disepakati" };
+
+function pieceSvg(ch, cls) {
+  const c = ch === ch.toUpperCase() ? "w" : "b";
+  return '<svg viewBox="0 0 45 45" class="' + (cls || "") + '"><use href="#pc-' + ch.toLowerCase() + '" class="pc ' + c + '"/></svg>';
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const initial = (n) => (String(n || "?").trim()[0] || "?").toUpperCase();
+
+let toastT;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200);
+}
+function confirmBox(title, text) {
+  return new Promise((res) => {
+    $("cfTitle").textContent = title; $("cfText").textContent = text; $("confirmOv").classList.add("on");
+    const done = (v) => { $("confirmOv").classList.remove("on"); $("cfYes").onclick = $("cfNo").onclick = null; res(v); };
+    $("cfYes").onclick = () => done(true); $("cfNo").onclick = () => done(false);
+  });
+}
+
+// ---------- jaringan (Firebase Realtime Database lewat REST + SSE) ----------
+const base = (p) => DB + "/chess/" + encodeURIComponent(SID) + "/" + p + ".json";
+const rid = () => Date.now().toString(36).padStart(9, "0") + Math.random().toString(36).slice(2, 8);
+async function put(path, data) {
+  const r = await fetch(base(path), { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+  if (!r.ok) throw new Error("http " + r.status);
+}
+function sendReq(obj) { return put("req/" + rid(), { ...obj, dev, ts: Date.now() }); }
+
+function setPath(root, parts, val) {
+  if (!parts.length) return val;
+  const o = root && typeof root === "object" ? root : {};
+  let n = o;
+  parts.slice(0, -1).forEach((k) => { if (n[k] == null || typeof n[k] !== "object") n[k] = {}; n = n[k]; });
+  if (val === null) delete n[parts[parts.length - 1]]; else n[parts[parts.length - 1]] = val;
+  return o;
+}
+function listen(path, onData, onState) {
+  const es = new EventSource(base(path));
+  let tree = null;
+  const apply = (e, isPatch) => {
+    const m = JSON.parse(e.data);
+    const parts = (m.path || "/").split("/").filter(Boolean);
+    if (isPatch) { for (const [k, v] of Object.entries(m.data || {})) tree = setPath(tree, [...parts, k], v); }
+    else tree = setPath(tree, parts, m.data);
+    onData(tree);
+  };
+  es.addEventListener("put", (e) => apply(e, false));
+  es.addEventListener("patch", (e) => apply(e, true));
+  es.onopen = () => onState && onState(true);
+  es.onerror = () => onState && onState(false);
+  es.addEventListener("cancel", () => { onState && onState(false); });
+  return es;
+}
+
+// ---------- tampilan ----------
+function stateOf() {
+  const s = S.pub && S.pub.state;
+  if (!s) return null;
+  return { b: String(s.b).split(""), turn: s.turn, c: s.c || {}, ep: s.ep == null ? -1 : s.ep, half: s.half || 0, full: s.full || 1 };
+}
+function myTurn(s) { return (S.role === "w" || S.role === "b") && s.turn === S.role && !S.pub.state.result && !!(S.pub.state.clock && S.pub.state.clock.run); }
+function flipped() { return S.role === "b"; }
+
+function renderBoard() {
+  const st = stateOf(); if (!st) return;
+  const info = S.pub.state;
+  const kingChk = E.inCheck(st) ? st.b.indexOf(st.turn === "w" ? "K" : "k") : -1;
+  const legalTo = new Set(S.legal.map((m) => m.to));
+  const flip = flipped();
+  let html = "";
+  for (let i = 0; i < 64; i++) {
+    const row = Math.floor(i / 8), col = i % 8;
+    const r = flip ? row : 7 - row, f = flip ? 7 - col : col;
+    const sq = r * 8 + f;
+    const dark = (r + f) % 2 === 0;
+    const p = st.b[sq];
+    const cls = ["sq", dark ? "d" : "", info.last && (info.last.from === sq || info.last.to === sq) ? "last" : "", S.selected === sq ? "sel" : "", kingChk === sq ? "chk" : ""].join(" ");
+    let inner = "";
+    if (col === 0) inner += '<span class="co r">' + (r + 1) + "</span>";
+    if (row === 7) inner += '<span class="co f">' + "abcdefgh"[f] + "</span>";
+    if (p !== ".") inner += pieceSvg(p, "pc-wrap");
+    if (legalTo.has(sq)) inner += p !== "." || (S.legal.find((m) => m.to === sq && m.ep)) ? '<span class="ring"></span>' : '<span class="dotm"></span>';
+    html += '<div class="' + cls + '" data-sq="' + sq + '" role="gridcell">' + inner + "</div>";
+  }
+  $("board").innerHTML = html;
+}
+
+function captured(st) {
+  const have = { w: { q: 0, r: 0, b: 0, n: 0, p: 0 }, b: { q: 0, r: 0, b: 0, n: 0, p: 0 } };
+  st.b.forEach((p) => { if (p !== "." && p.toLowerCase() !== "k") have[p === p.toUpperCase() ? "w" : "b"][p.toLowerCase()]++; });
+  const start = { q: 1, r: 2, b: 2, n: 2, p: 8 };
+  const lostW = {}, lostB = {};
+  let mat = 0;
+  for (const t of Object.keys(start)) { lostW[t] = Math.max(0, start[t] - have.w[t]); lostB[t] = Math.max(0, start[t] - have.b[t]); mat += (have.w[t] - have.b[t]) * VAL[t]; }
+  return { lostW, lostB, mat };
+}
+function capHtml(lost, color, adv) {
+  let h = "";
+  Object.keys(lost).sort((a, b) => PIECE_ORDER[a] - PIECE_ORDER[b]).forEach((t) => { for (let i = 0; i < lost[t]; i++) h += pieceSvg(color === "w" ? t.toUpperCase() : t); });
+  return '<span class="cap">' + h + "</span>" + (adv > 0 ? "<span>+" + adv + "</span>" : "");
+}
+
+function renderPlayers() {
+  const meta = S.pub.meta, st = stateOf(), seats = S.pub.seats || {};
+  const cap = captured(st), done = !!S.pub.state.result;
+  const flip = flipped();
+  const top = flip ? "w" : "b", bot = flip ? "b" : "w";
+  const row = (side) => {
+    const m = meta[side] || {};
+    const lost = side === "w" ? cap.lostB : cap.lostW;   // bidak lawan yang sudah diambil
+    const adv = side === "w" ? Math.max(0, cap.mat) : Math.max(0, -cap.mat);
+    const here = m.bot || seats[side];
+    const turnOn = !done && st.turn === side;
+    return '<div class="avatar ' + side + '">' + (m.bot ? "★" : esc(initial(m.name))) + "</div>" +
+      '<div style="min-width:0"><div class="pname">' + esc(m.name || "—") + (m.bot ? " · Bot" : "") + "</div>" +
+      '<div class="pmeta">' + capHtml(lost, side === "w" ? "b" : "w", adv) + (here ? "" : "<span>belum masuk</span>") + "</div></div>" +
+      '<div class="clk" data-clk="' + side + '">--:--</div>' +
+      '<div class="turn' + (turnOn ? " on" : "") + '">' + (turnOn ? "Giliran" : (side === "w" ? "Putih" : "Hitam")) + "</div>";
+  };
+  $("topP").innerHTML = row(top); $("botP").innerHTML = row(bot);
+}
+
+function renderStatus() {
+  const s = S.pub.state, st = stateOf(), meta = S.pub.meta;
+  const nm = (sd) => esc((meta[sd] || {}).name || (sd === "w" ? "Putih" : "Hitam"));
+  let line = "";
+  const started = s.clock && s.clock.run;
+  if (s.result) line = "<strong>Game selesai</strong>";
+  else if (!started) line = "Menunggu kedua pemain bergabung…";
+  else if (S.pending) line = "Memproses langkah…";
+  else if (myTurn(st)) line = "<strong>Giliranmu</strong>" + (s.status === "check" ? " · Skak!" : "");
+  else line = "Menunggu <strong>" + nm(st.turn) + "</strong>" + (s.status === "check" ? " · Skak!" : "");
+  if (s.drawOffer && !s.result) line += " · " + (S.role === s.drawOffer ? "tawaran remis terkirim" : "lawan menawarkan remis");
+  $("status").innerHTML = line;
+  const box = $("resultBox");
+  if (s.result) {
+    const why = RESULT_TXT[s.end || s.status] || "";
+    const head = s.result === "d" ? "Seri" : (s.result === "w" ? "Putih" : "Hitam") + " menang";
+    const who = s.result === "d" ? "" : " · " + nm(s.result);
+    box.innerHTML = '<div class="result"><h3>' + head + who + "</h3><p>" + esc(why) + " · sesi ditutup sebentar lagi.</p></div>";
+  } else box.innerHTML = "";
+  const canAct = (S.role === "w" || S.role === "b") && !s.result;
+  $("actions").classList.toggle("hidden", !canAct);
+  const other = S.role === "w" ? "b" : "w";
+  $("drawBtn").disabled = !canAct || !!(meta[other] && meta[other].bot);
+  $("drawBtn").textContent = s.drawOffer && s.drawOffer !== S.role ? "Terima remis" : "Tawarkan remis";
+}
+
+function renderMoves() {
+  const h = S.pub.state.hist || [];
+  if (!h.length) { $("moves").innerHTML = '<div class="empty">Belum ada langkah.</div>'; return; }
+  let out = "";
+  for (let i = 0; i < h.length; i += 2) {
+    const a = i === h.length - 1 ? "cur" : "", b = i + 1 === h.length - 1 ? "cur" : "";
+    out += '<div class="mv"><span class="n">' + (i / 2 + 1) + '.</span><span class="' + a + '">' + esc(h[i]) + '</span><span class="' + b + '">' + esc(h[i + 1] || "") + "</span></div>";
+  }
+  const el = $("moves"); el.innerHTML = out; el.scrollTop = el.scrollHeight;
+}
+
+function renderChat(tree) {
+  const items = Object.entries(tree || {}).sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-80);
+  const el = $("msgs");
+  const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  el.innerHTML = items.length ? items.map(([, m]) => {
+    const t = new Date(m.t || 0), hh = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+    return '<div class="msg' + (m.cid === cid ? " me" : "") + '"><b>' + esc(m.name || "?") + "</b>" + esc(m.text || "") + "<time>" + hh + "</time></div>";
+  }).join("") : '<div class="empty">Belum ada pesan. Penonton dan pemain bisa ngobrol di sini.</div>';
+  if (atEnd) el.scrollTop = el.scrollHeight;
+}
+
+function renderRole() {
+  const r = S.role;
+  $("roleP").innerHTML = r === "w" ? "Kamu: <b>Putih</b>" : r === "b" ? "Kamu: <b>Hitam</b>" : r === "spec" ? "<b>Penonton</b>" : "<span>—</span>";
+}
+
+const fmt = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+function tickClocks() {
+  const st = S.pub && S.pub.state; if (!st || !st.clock) return;
+  const c = st.clock;
+  document.querySelectorAll("[data-clk]").forEach((el) => {
+    const sd = el.dataset.clk;
+    let left = c[sd] == null ? 0 : c[sd];
+    const running = c.run === sd && !st.result;
+    if (running) left -= Date.now() - (S.recvAt || Date.now());
+    el.textContent = fmt(left);
+    el.classList.toggle("on", running);
+    el.classList.toggle("low", running && left < 30000);
+  });
+}
+setInterval(tickClocks, 250);
+
+function renderAll() {
+  if (!S.pub || !S.pub.state || !S.pub.meta) return;
+  renderBoard(); renderPlayers(); renderStatus(); renderMoves(); renderRole(); tickClocks();
+}
+
+// ---------- interaksi papan ----------
+$("board").addEventListener("click", (e) => {
+  const el = e.target.closest(".sq"); if (!el || !S.pub) return;
+  const sq = Number(el.dataset.sq), st = stateOf();
+  if (!st || !myTurn(st) || S.pending) return;
+  const mv = S.legal.filter((m) => m.to === sq && S.selected >= 0);
+  if (mv.length) return doMove(mv);
+  const p = st.b[sq];
+  if (p !== "." && (p === p.toUpperCase()) === (st.turn === "w")) {
+    S.selected = sq;
+    S.legal = E.legalMoves(st).filter((m) => m.from === sq);
+  } else { S.selected = -1; S.legal = []; }
+  renderBoard();
+});
+
+async function doMove(moves) {
+  let promo = "q";
+  if (moves.some((m) => m.promo)) {
+    promo = await pickPromo(); if (!promo) return;
+  }
+  const m = moves[0];
+  S.pending = true; S.lastN = S.pub.state.n; S.selected = -1; S.legal = [];
+  renderBoard(); renderStatus();
+  try { await sendReq({ t: "move", from: m.from, to: m.to, promo }); }
+  catch { S.pending = false; toast("Gagal mengirim langkah. Coba lagi."); renderStatus(); return; }
+  setTimeout(() => { if (S.pending && S.pub.state.n === S.lastN) { S.pending = false; renderStatus(); toast("Langkah tidak diterima."); } }, 6000);
+}
+function pickPromo() {
+  return new Promise((res) => {
+    const white = S.role === "w";
+    $("promoRow").innerHTML = ["q", "r", "b", "n"].map((t) => '<button data-p="' + t + '" aria-label="' + t + '">' + pieceSvg(white ? t.toUpperCase() : t) + "</button>").join("");
+    $("promoOv").classList.add("on");
+    $("promoRow").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; $("promoOv").classList.remove("on"); res(b.dataset.p); };
+    $("promoOv").onclick = (e) => { if (e.target === $("promoOv")) { $("promoOv").classList.remove("on"); res(null); } };
+  });
+}
+
+$("resignBtn").onclick = async () => { if (await confirmBox("Menyerah?", "Kamu akan dinyatakan kalah di game ini.")) sendReq({ t: "resign" }).catch(() => toast("Gagal mengirim.")); };
+$("drawBtn").onclick = async () => {
+  const s = S.pub.state;
+  if (s.drawOffer && s.drawOffer !== S.role) { sendReq({ t: "draw" }).catch(() => {}); return; }
+  if (await confirmBox("Tawarkan remis?", "Lawan akan melihat tawaran ini dan bisa menerimanya.")) { sendReq({ t: "draw" }).catch(() => toast("Gagal mengirim.")); toast("Tawaran remis dikirim."); }
+};
+
+// ---------- chat & tab ----------
+function selectTab(name) {
+  const chat = name === "chat";
+  $("tabMoves").setAttribute("aria-selected", String(!chat)); $("tabChat").setAttribute("aria-selected", String(chat));
+  $("pMoves").classList.toggle("on", !chat); $("pChat").classList.toggle("on", chat);
+}
+$("tabMoves").onclick = () => selectTab("moves"); $("tabChat").onclick = () => selectTab("chat");
+$("chatForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("chatIn").value.trim(); if (!text) return;
+  const name = S.nick || ((S.pub.meta[S.role] || {}).name) || "Penonton";
+  $("chatIn").value = "";
+  put("pub/chat/" + rid(), { name: name.slice(0, 24), text: text.slice(0, 200), t: Date.now(), cid }).catch(() => toast("Pesan gagal dikirim."));
+});
+
+// ---------- masuk (klaim kursi / penonton) ----------
+function openJoin() {
+  const m = S.pub.meta;
+  $("vsA").textContent = (m.w && m.w.name) || "Putih"; $("vsB").textContent = (m.b && m.b.name) || "Hitam";
+  const saved = store.get("chess_" + SID) || {};
+  if (saved.num) $("num").value = saved.num; if (saved.nick) $("nick").value = saved.nick;
+  $("joinOv").classList.add("on");
+}
+function enter(role, nick) {
+  S.role = role; S.nick = nick; $("joinOv").classList.remove("on"); renderAll();
+  if (role === "spec") selectTab("moves");
+}
+let claimWait = null, claimListening = false;
+function claim(num, nick, silent) {
+  store.set("chess_" + SID, { num, nick });
+  S.nick = nick;
+  claimWait = { nick, silent };
+  if (!claimListening) { claimListening = true; listen("claims/" + dev, onClaimResult); }
+  sendReq({ t: "claim", num }).catch(() => { $("joinErr").textContent = "Tidak bisa terhubung. Coba lagi."; });
+}
+function onClaimResult(c) {
+    if (!c || !claimWait) return;
+    const w = claimWait; claimWait = null;
+    if (c.role === "w" || c.role === "b") { enter(c.role, w.nick); toast("Masuk sebagai " + (c.role === "w" ? "Putih" : "Hitam")); }
+    else {
+      enter("spec", w.nick);
+      toast(c.why === "seat_taken" ? "Kursi itu sudah dipakai perangkat lain — kamu menonton." : "Nomor tidak terdaftar sebagai pemain — kamu menonton.");
+    }
+}
+$("joinForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const num = $("num").value.replace(/[^\d+]/g, ""), nick = $("nick").value.trim();
+  if (num.replace(/\D/g, "").length < 8) { $("joinErr").textContent = "Isi nomor WhatsApp yang valid, atau pilih Tonton saja."; return; }
+  $("joinErr").textContent = ""; claim(num, nick);
+});
+$("watchBtn").onclick = () => { const nick = $("nick").value.trim() || "Penonton"; store.set("chess_" + SID, { nick }); enter("spec", nick); };
+
+// ---------- mulai ----------
+function setConn(ok) { $("conn").className = "dot " + (ok ? "ok" : "bad"); $("connT").textContent = ok ? "langsung" : "terputus"; }
+function boot() {
+  if (!SID || !DB) { $("endOv").classList.add("on"); return; }
+  listen("pub", (pub) => {
+    if (pub == null) { try { localStorage.removeItem("chess_" + SID); } catch {} S.closed = true; $("endOv").classList.add("on"); return; }
+    const first = !S.seen && pub.state && pub.meta;
+    S.pub = pub;
+    if (!S.stampN || S.stampN !== (pub.state && pub.state.n + ":" + (pub.state.clock && pub.state.clock.at))) { S.recvAt = Date.now(); S.stampN = pub.state && pub.state.n + ":" + (pub.state.clock && pub.state.clock.at); }
+    if (pub.state && pub.meta) {
+      if (first) {
+        S.seen = true;
+        const saved = store.get("chess_" + SID);
+        if (saved && saved.num) claim(saved.num, saved.nick || "", true); else openJoin();
+      }
+      if (S.pending && pub.state.n !== S.lastN) S.pending = false;
+      if (S.prevN !== pub.state.n) { S.selected = -1; S.legal = []; S.prevN = pub.state.n; }
+      renderAll(); renderChat(pub.chat);
+    }
+  }, setConn);
+}
+boot();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tic Tac Toe</title><style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;padding:0;background:#17120d;color:#efe6d6;font-family:Georgia,'Times New Roman',serif}
+.wrap{max-width:460px;margin:0 auto;padding:14px 12px 16px;background:radial-gradient(ellipse at 50% 0,#3a2a1b 0,#17120d 70%)}
+h1{font-size:22px;margin:0 0 2px;text-align:center;letter-spacing:.5px}
+.sub{font-size:12px;opacity:.7;text-align:center;margin:0 0 12px}
+.row{display:flex;gap:8px;margin:8px 0}
+button{flex:1;font:600 13px Georgia,serif;letter-spacing:1px;text-transform:uppercase;color:#efe6d6;background:#2b2118;border:1px solid #5a4630;border-radius:10px;padding:11px 6px}
+button:active{transform:scale(.97)}button.on{background:#c9a24a;color:#1b140c;border-color:#c9a24a}button.gold{background:#c9a24a;color:#1b140c}
+.status{text-align:center;font-size:15px;min-height:22px;margin:8px 0 2px}.hint{text-align:center;font-size:11px;opacity:.6}
+.hide{display:none!important}.lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin:10px 0 4px}
+
+:root{--t:min(27vw,112px)}.grid{display:grid;grid-template-columns:repeat(3,var(--t));gap:8px;justify-content:center;margin:6px 0}
+.c{width:var(--t);height:var(--t);display:flex;align-items:center;justify-content:center;font-size:calc(var(--t)*.72);background:#2b2118;border:1px solid #5a4630;border-radius:12px;font-family:Arial,sans-serif;font-weight:700}
+.x{color:#e8574c}.o{color:#4fb3d9}.win{background:#4a3a1c;border-color:#c9a24a}.score{display:flex;justify-content:space-around;font-size:13px;margin:4px 0 8px;opacity:.9}</style></head><body><div class="wrap"><h1>❌⭕ Tic Tac Toe</h1><p class="sub" id="sub">Ketuk kotak untuk jalan.</p>
+<div class="row"><button id="mAI" class="on">🤖 Vs AI</button><button id="mTwo">👥 2 Pemain</button></div>
+<div class="row" id="lvBox"><button id="lvE">Mudah</button><button id="lvH" class="on">Sulit</button></div>
+<div class="score"><span>❌ <b id="sx">0</b></span><span>Seri <b id="sd">0</b></span><span>⭕ <b id="so">0</b></span></div>
+<div class="grid" id="g"></div><div class="status" id="st"></div><div class="row"><button class="gold" id="again">Ronde baru</button></div></div><script>
+const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+let mode='ai',hard=true,b,turn,over,sc={X:0,O:0,D:0},first='X';const $=id=>document.getElementById(id);
+function pick(on,off){$(on).classList.add('on');$(off).classList.remove('on')}
+$('mAI').onclick=()=>{mode='ai';pick('mAI','mTwo');$('lvBox').classList.remove('hide');reset()};
+$('mTwo').onclick=()=>{mode='two';pick('mTwo','mAI');$('lvBox').classList.add('hide');reset()};
+$('lvE').onclick=()=>{hard=false;pick('lvE','lvH')};$('lvH').onclick=()=>{hard=true;pick('lvH','lvE')};
+$('again').onclick=()=>{first=first==='X'?'O':'X';reset()};
+function win(b){for(const l of L)if(b[l[0]]&&b[l[0]]===b[l[1]]&&b[l[0]]===b[l[2]])return l;return null}
+function reset(){b=Array(9).fill('');turn='X';over=false;draw();if(mode==='ai'&&first==='O'){turn='O';draw();setTimeout(ai,250)}}
+function minimax(bd,t,me){const w=win(bd);if(w)return bd[w[0]]===me?10:-10;if(bd.every(Boolean))return 0;let best=t===me?-99:99;
+ for(let i=0;i<9;i++)if(!bd[i]){bd[i]=t;const v=minimax(bd,t==='X'?'O':'X',me);bd[i]='';best=t===me?Math.max(best,v):Math.min(best,v)}return best}
+function ai(){if(over)return;const fr=[...Array(9).keys()].filter(i=>!b[i]);let m;
+ if(!hard&&Math.random()<.6)m=fr[Math.floor(Math.random()*fr.length)];
+ else{let bs=-99,c=[];for(const i of fr){b[i]='O';const v=minimax(b,'X','O');b[i]='';if(v>bs){bs=v;c=[i]}else if(v===bs)c.push(i)}m=c[Math.floor(Math.random()*c.length)]}
+ play(m)}
+function play(i){if(over||b[i])return;b[i]=turn;const w=win(b);
+ if(w){over=true;sc[turn]++}else if(b.every(Boolean)){over=true;sc.D++}else turn=turn==='X'?'O':'X';draw()}
+function draw(){const g=$('g');g.innerHTML='';const w=win(b);
+ b.forEach((v,i)=>{const d=document.createElement('div');d.className='c '+(v==='X'?'x':'o')+(w&&w.includes(i)?' win':'');d.textContent=v==='X'?'✕':v==='O'?'◯':'';d.onclick=()=>{if(mode==='ai'&&turn==='O')return;play(i);if(mode==='ai'&&!over&&turn==='O')setTimeout(ai,280)};g.appendChild(d)});
+ $('sx').textContent=sc.X;$('so').textContent=sc.O;$('sd').textContent=sc.D;
+ $('st').textContent=over?(w?('🏆 '+(turn==='X'?'❌':'⭕')+' menang!'):'🤝 Seri!'):('Giliran '+(turn==='X'?'❌':'⭕'))}
+reset();
+</script></body></html>
