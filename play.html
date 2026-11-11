@@ -59,6 +59,24 @@ button{font:inherit;color:inherit;cursor:pointer}
 .mc.n1{color:#5fa8ff}.mc.n2{color:#4fcf8a}.mc.n3{color:#ff7a70}.mc.n4{color:#b18cff}.mc.n5{color:#ffb454}.mc.n6{color:#4fd1d1}.mc.n7{color:#ddd}.mc.n8{color:#999}
 .mc.bomb{background:#3a2826}.mc.boom{background:var(--danger);color:#fff}
 .mc svg{width:62%;height:62%}
+.gmtag{display:inline-block;padding:0 5px;margin-right:2px;border-radius:4px;background:#c0392b;color:#fff;font-size:11px;font-weight:800;letter-spacing:.04em;line-height:16px;vertical-align:1px}
+.avatar.gm{background:#c0392b;color:#fff;font-weight:800}
+.elo{margin-top:12px}
+.elo .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.elo .chips .btn{min-height:42px;padding:0;font-variant-numeric:tabular-nums}
+.elo .chips .btn.on{background:var(--accent,#81b64c);border-color:transparent;color:var(--accent-ink,#fff)}
+.elo .hint{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.minebar{display:flex;align-items:center;gap:10px;margin:10px 0 2px}
+.minebar .seg{flex:1;margin:0}
+.fcount{display:flex;align-items:center;gap:6px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.fcount svg{width:18px;height:18px}
+.mc{transition:background .12s,transform .08s}
+.mc:not(:disabled):active,.mc.dig{background:#47443f;transform:scale(.94)}
+.mc.dig{animation:digp .5s ease-in-out infinite alternate}
+@keyframes digp{to{background:#3a3834}}
+.mc.pop{animation:popin .2s ease-out backwards}
+@keyframes popin{from{transform:scale(.55);opacity:.2}}
+@media(prefers-reduced-motion:reduce){.mc.pop,.mc.dig{animation:none}}
 .acct{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);font-size:13.5px}
 .acct small{color:var(--muted)}.acct button{border:0;background:transparent;color:var(--accent);font-weight:700;padding:6px}
 .gsel .btn{font-size:13.5px;padding:0 6px}
@@ -79,6 +97,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .status{display:flex;align-items:center;gap:8px;padding:8px 4px 2px;min-height:38px;color:var(--muted);font-size:13.5px}
 .status strong{color:var(--text)}
 .actions{display:flex;gap:8px;padding:8px 2px 0}
+input.bad{border-color:var(--danger)!important;animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 .btn{flex:1;min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface2);font-weight:600}
 .btn:active{transform:scale(.98)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -170,6 +190,13 @@ body.lobbyMode .app{display:none}
     <section class="card boardcard">
       <div class="player" id="topP"></div>
       <div class="boardwrap"><div class="board" id="board" role="grid" aria-label="Papan catur"></div></div>
+      <div class="minebar hidden" id="mineBar">
+        <div class="seg mm" role="group" aria-label="Mode ketukan">
+          <button class="btn on" type="button" id="mDig">Gali</button>
+          <button class="btn" type="button" id="mFlag">Bendera</button>
+        </div>
+        <div class="fcount" id="fCount"></div>
+      </div>
       <div class="player" id="botP"></div>
       <div class="status" id="status"></div>
       <div id="resultBox"></div>
@@ -218,6 +245,15 @@ body.lobbyMode .app{display:none}
   <div class="seg">
     <button class="btn" id="modeP" type="button">Lawan Player</button>
     <button class="btn" id="modeB" type="button">Lawan Bot</button>
+  </div>
+  <div id="eloBox" class="elo hidden">
+    <div class="sec" style="margin:0">Tingkat kesulitan Bot (ELO)</div>
+    <div class="chips" id="eloChips">
+      <button class="btn" type="button" data-e="200">200</button><button class="btn" type="button" data-e="400">400</button><button class="btn" type="button" data-e="800">800</button><button class="btn" type="button" data-e="1000">1000</button>
+      <button class="btn" type="button" data-e="1500">1500</button><button class="btn" type="button" data-e="2000">2000</button><button class="btn" type="button" data-e="2800">2800 GM</button>
+    </div>
+    <div class="hint" id="eloHint"></div>
+    <div class="row"><button class="btn primary" id="eloGo" type="button">Mulai lawan Bot</button></div>
   </div>
   <div class="lstat" id="lstat"></div>
   <div id="lwait" class="row hidden" style="margin-top:0"><button class="btn" id="lcancel" type="button">Batalkan tantangan</button></div>
@@ -499,32 +535,88 @@ function ordered(st, moves) {
 		.map((x) => x.m);
 }
 
-function search(st, depth, alpha, beta, ctx) {
-	if (++ctx.nodes > ctx.limit) return evaluate(st) * (st.turn === "w" ? 1 : -1);
-	const moves = legalMoves(st);
-	if (!moves.length) return inCheck(st) ? -100000 - depth : 0;
-	if (depth === 0) return evaluate(st) * (st.turn === "w" ? 1 : -1);
-	for (const m of ordered(st, moves)) {
-		const sc = -search(apply(st, m), depth - 1, -beta, -alpha, ctx);
+const MATE = 100000;
+function qsearch(st, alpha, beta, ctx, qd) {
+	const stand = evaluate(st) * (st.turn === "w" ? 1 : -1);
+	if (qd <= 0 || ++ctx.nodes > ctx.limit) return stand;
+	if (stand >= beta) return beta;
+	if (stand > alpha) alpha = stand;
+	const caps = ordered(st, pseudo(st).filter((m) => m.ep || st.b[m.to] !== "." || m.promo === "q"));
+	for (const m of caps) {
+		const ns = apply(st, m);
+		if (inCheck(ns, st.turn)) continue;
+		const sc = -qsearch(ns, -beta, -alpha, ctx, qd - 1);
 		if (sc >= beta) return beta;
 		if (sc > alpha) alpha = sc;
 	}
 	return alpha;
 }
 
-// level: 1 (acak berbobot), 2 (kedalaman 2), 3 (kedalaman 3)
+function search(st, depth, alpha, beta, ctx) {
+	if (ctx.stop) return 0;
+	if ((++ctx.nodes & 255) === 0 && ctx.deadline && Date.now() > ctx.deadline) { ctx.stop = true; return 0; }
+	if (ctx.nodes > ctx.limit) return evaluate(st) * (st.turn === "w" ? 1 : -1);
+	const moves = legalMoves(st);
+	if (!moves.length) return inCheck(st) ? -MATE - depth : 0;
+	if (depth <= 0) return ctx.q ? qsearch(st, alpha, beta, ctx, ctx.q) : evaluate(st) * (st.turn === "w" ? 1 : -1);
+	for (const m of ordered(st, moves)) {
+		const sc = -search(apply(st, m), depth - 1, -beta, -alpha, ctx);
+		if (ctx.stop) return 0;
+		if (sc >= beta) return beta;
+		if (sc > alpha) alpha = sc;
+	}
+	return alpha;
+}
+
+/** Tingkat kesulitan berdasarkan perkiraan ELO. depth/ms = kekuatan mencari, noise = ketidaktelitian (centipawn),
+ *  rnd = peluang main langkah acak, hang = peluang sengaja mengabaikan tangkapan bagus. */
+const ELO_LEVELS = [200, 400, 800, 1000, 1500, 2000, 2800];
+const PROFILE = {
+	200: { depth: 1, q: 0, ms: 0, noise: 400, rnd: 0.55 },
+	400: { depth: 1, q: 0, ms: 0, noise: 250, rnd: 0.3 },
+	800: { depth: 1, q: 0, ms: 0, noise: 120, rnd: 0.1 },
+	1000: { depth: 2, q: 0, ms: 0, noise: 70, rnd: 0.04 },
+	1500: { depth: 3, q: 2, ms: 700, noise: 25, rnd: 0 },
+	2000: { depth: 4, q: 4, ms: 1200, noise: 6, rnd: 0 },
+	2800: { depth: 9, q: 6, ms: 2500, noise: 0, rnd: 0 },
+};
+const gmTitle = (elo) => (elo >= 2800 ? "GM" : "");
+const normElo = (e) => { e = Number(e); return ELO_LEVELS.includes(e) ? e : 1000; };
+
+// level: angka kecil (1-3) = kedalaman lama; angka >= 200 = ELO
 function bestMove(st, level = 2) {
 	const moves = ordered(st, legalMoves(st));
 	if (!moves.length) return null;
-	const depth = Math.max(1, level - 0);
-	const ctx = { nodes: 0, limit: 60000 };
-	let best = [], bestScore = -Infinity;
-	for (const m of moves) {
-		const sc = -search(apply(st, m), depth - 1, -Infinity, Infinity, ctx);
-		if (sc > bestScore + 5) { bestScore = sc; best = [m]; }
-		else if (Math.abs(sc - bestScore) <= 5) best.push(m);
+	const elo = level >= 100 ? normElo(level) : 0;
+	const P = elo ? PROFILE[elo] : { depth: Math.max(1, level), q: 0, ms: 0, noise: 0, rnd: 0 };
+	if (P.rnd && Math.random() < P.rnd) return moves[Math.floor(Math.random() * moves.length)];
+	const ctx = { nodes: 0, limit: elo ? 4e6 : 60000, q: P.q, deadline: 0, stop: false };
+	const t0 = Date.now();
+	let best = moves[0], bestScore = -Infinity;
+	for (let d = 1; d <= P.depth; d++) {
+		if (P.ms) ctx.deadline = t0 + P.ms;
+		const scored = [];
+		let alpha = -Infinity;
+		let done = true;
+		for (const m of moves) {
+			const sc = -search(apply(st, m), d - 1, -Infinity, P.noise ? Infinity : -(alpha - 4), ctx);
+			if (ctx.stop) { done = false; break; }
+			scored.push([m, sc]);
+			if (sc > alpha) alpha = sc;
+		}
+		if (!done) break;
+		// hanya kedalaman terakhir yang selesai dipakai
+		const noisy = scored.map(([m, sc]) => [m, sc + (P.noise ? (Math.random() * 2 - 1) * P.noise : 0)]);
+		const top = Math.max(...noisy.map((x) => x[1]));
+		const cand = noisy.filter((x) => x[1] >= top - (elo ? 3 : 5)).map((x) => x[0]);
+		best = cand[Math.floor(Math.random() * cand.length)];
+		bestScore = top;
+		// urutkan langkah terbaik dulu untuk kedalaman berikutnya
+		moves.sort((a, b) => (scored.find((x) => x[0] === b)?.[1] ?? -1e9) - (scored.find((x) => x[0] === a)?.[1] ?? -1e9));
+		if (Math.abs(bestScore) > MATE / 2) break;
+		if (P.ms && Date.now() - t0 > P.ms * 0.55) break;
 	}
-	return best[Math.floor(Math.random() * best.length)] || moves[0];
+	return best;
 }
 
 return { legalMoves, apply, status, inCheck, sqName };
@@ -633,22 +725,32 @@ function myTurn(s) {
 function flipped() { return S.role === "b"; }
 
 const isM = () => !!(S.pub && S.pub.meta && S.pub.meta.game === "mine");
-S.flags = new Set();
+S.flags = new Set(); S.digging = new Set(); S.flagMode = false; S.lastDig = -1; S.prevView = null;
 function renderM() {
   const info = S.pub.state, bd = $("board"), v = String(info.view || "");
   bd.classList.add("mine"); bd.setAttribute("aria-label", "Papan minesweeper");
   const can = S.role === "w" && !info.result;
+  const prev = S.prevView, o = S.lastDig;
+  const orow = o >= 0 ? Math.floor(o / 9) : 0, ocol = o >= 0 ? o % 9 : 0;
+  S.digging.forEach((i) => { if ((v[i] || "?") !== "?") S.digging.delete(i); });
   let h = "";
   for (let i = 0; i < 81; i++) {
     const c = v[i] || "?";
-    let cls = "mc", txt = "";
-    if (c === "?") { if (S.flags.has(i) && !info.result) txt = IC.flag; }
-    else if (c === "M") { cls += " bomb"; txt = IC.bomb; }
-    else if (c === "X") { cls += " boom"; txt = IC.bomb; }
-    else { cls += " o" + (c !== "0" ? " n" + c : ""); txt = c === "0" ? "" : c; }
-    h += '<button class="' + cls + '" data-m="' + i + '"' + (c !== "?" || !can ? " disabled" : "") + ">" + txt + "</button>";
+    let cls = "mc", txt = "", st = "";
+    if (c === "?") {
+      if (S.flags.has(i) && !info.result) txt = IC.flag;
+      else if (S.digging.has(i)) cls += " dig";
+    } else {
+      if (c === "M") { cls += " bomb"; txt = IC.bomb; }
+      else if (c === "X") { cls += " boom"; txt = IC.bomb; }
+      else { cls += " o" + (c !== "0" ? " n" + c : ""); txt = c === "0" ? "" : c; }
+      if (prev && (prev[i] || "?") === "?") { cls += " pop"; st = ' style="animation-delay:' + Math.min(320, Math.hypot(Math.floor(i / 9) - orow, (i % 9) - ocol) * 22) + 'ms"'; }
+    }
+    h += '<button class="' + cls + '" data-m="' + i + '"' + st + (c !== "?" || !can ? " disabled" : "") + ">" + txt + "</button>";
   }
-  bd.innerHTML = h; S.boardHtml = null;
+  bd.innerHTML = h; S.boardHtml = null; S.prevView = v;
+  const left = (info.mines || 10) - [...S.flags].filter((i) => (v[i] || "?") === "?").length;
+  $("fCount").innerHTML = IC.flag + "<span>" + left + "</span>";
 }
 const isT = () => !!(S.pub && S.pub.meta && S.pub.meta.game === "ttt");
 const sideName = (sd) => (isT() ? (sd === "w" ? "X" : "O") : (sd === "w" ? "Putih" : "Hitam"));
@@ -776,8 +878,8 @@ function renderPlayers() {
     const adv = side === "w" ? Math.max(0, cap.mat) : Math.max(0, -cap.mat);
     const here = m.bot || seats[side];
     const turnOn = !done && st.turn === side;
-    return '<div class="avatar ' + side + '">' + (m.bot ? "AI" : esc(initial(m.name))) + "</div>" +
-      '<div style="min-width:0"><div class="pname">' + esc(m.name || "—") + (m.bot && m.name !== "Bot" ? " · Bot" : "") + "</div>" +
+    return '<div class="avatar ' + side + (m.title ? " gm" : "") + '">' + (m.title ? esc(m.title) : m.bot ? "AI" : esc(initial(m.name))) + "</div>" +
+      '<div style="min-width:0"><div class="pname">' + (m.title ? '<span class="gmtag">' + esc(m.title) + "</span> " : "") + esc(m.name || "—") + (m.bot && m.name !== "Bot" && !m.elo ? " · Bot" : "") + "</div>" +
       '<div class="pmeta">' + capHtml(lost, side === "w" ? "b" : "w", adv) + (here ? "" : "<span>belum masuk</span>") + "</div></div>" +
       '<div class="clk" data-clk="' + side + '">--:--</div>' +
       '<div class="turn' + (turnOn ? " on" : "") + '">' + (turnOn ? "Giliran" : (side === "w" ? "Putih" : "Hitam")) + "</div>";
@@ -791,7 +893,7 @@ function renderStatusM() {
   if (s.result) line = "<strong>Game selesai</strong>";
   else if (S.role !== "w") line = "Kamu menonton permainan ini.";
   else if (!s.clock || !s.clock.run) line = "Ketuk kotak mana saja untuk mulai · tahan kotak untuk memasang bendera";
-  else line = "Buka semua kotak aman · tahan kotak untuk memasang bendera";
+  else line = "Buka semua kotak aman · pakai tombol Bendera atau tahan kotak untuk memasang bendera";
   $("status").innerHTML = line;
   const box = $("resultBox");
   if (s.result) {
@@ -855,6 +957,7 @@ function renderChat(tree) {
 }
 
 function renderRole() {
+  $("mineBar").classList.toggle("hidden", !(isM() && S.role === "w"));
   const r = S.role;
   $("roleP").innerHTML = isM() && r === "w" ? "Kamu: <b>Pemain</b>" : r === "w" ? "Kamu: <b>" + sideName("w") + "</b>" : r === "b" ? "Kamu: <b>" + sideName("b") + "</b>" : r === "spec" ? "<b>Penonton</b>" : "<span>—</span>";
 }
@@ -895,6 +998,8 @@ function renderAll() {
 
 // ---------- interaksi papan ----------
 let holdT = null, held = false;
+function setFlagMode(on) { S.flagMode = on; $("mFlag").classList.toggle("on", on); $("mDig").classList.toggle("on", !on); }
+$("mDig").onclick = () => setFlagMode(false); $("mFlag").onclick = () => setFlagMode(true);
 function toggleFlag(i) { if (S.flags.has(i)) S.flags.delete(i); else S.flags.add(i); renderBoard(); }
 $("board").addEventListener("pointerdown", (e) => {
   if (!isM()) return;
@@ -906,13 +1011,15 @@ $("board").addEventListener("pointerdown", (e) => {
 $("board").addEventListener("contextmenu", (e) => { if (!isM()) return; e.preventDefault(); const c = e.target.closest(".mc"); if (c && !c.disabled) { held = true; toggleFlag(Number(c.dataset.m)); } });
 $("board").addEventListener("click", (e) => {
   if (isM()) {
-    const c = e.target.closest(".mc"); if (!c || c.disabled || !S.pub || S.pending) return;
+    const c = e.target.closest(".mc"); if (!c || c.disabled || !S.pub) return;
     if (held) { held = false; return; }
     const i = Number(c.dataset.m);
-    if (S.flags.has(i)) { toggleFlag(i); return; }
-    S.pending = true; S.lastN = S.pub.state.n;
-    sendReq({ t: "move", to: i }).catch(() => { S.pending = false; toast("Gagal mengirim langkah. Coba lagi."); });
-    setTimeout(() => { if (S.pending && S.pub.state.n === S.lastN) { S.pending = false; } }, 5000);
+    if (S.flagMode || S.flags.has(i)) { toggleFlag(i); return; }
+    if (S.digging.has(i)) return;
+    // tampil langsung (kotak menekan); beberapa ketukan boleh diantre tanpa menunggu server
+    S.digging.add(i); S.lastDig = i; c.classList.add("dig");
+    sendReq({ t: "move", to: i }).catch(() => { S.digging.delete(i); c.classList.remove("dig"); toast("Gagal mengirim langkah. Coba lagi."); });
+    setTimeout(() => { if (S.digging.delete(i)) renderBoard(); }, 8000);
     return;
   }
   if (isT()) {
@@ -1171,6 +1278,7 @@ function bootLobby() {
   function paintGame() {
     document.querySelectorAll("#gSel .gt").forEach((b) => b.classList.toggle("on", b.dataset.g === G));
     $("modeP").classList.toggle("hidden", G === "mine");
+    $("eloBox").classList.add("hidden");
     $("modeB").textContent = G === "mine" ? "Main" : "Lawan Bot";
     if (G === "mine" && mode === "p") { mode = ""; $("modeP").classList.remove("on"); }
   }
@@ -1212,6 +1320,7 @@ function bootLobby() {
     baseT = c.t;
     if (c.hello) {
       joined = true; if (c.cid) myCid = c.cid;
+      if (c.nameTaken) { $("lname").value = ""; store.set("chess_name", ""); $("lname").classList.add("bad"); setTimeout(() => $("lname").classList.remove("bad"), 2500); toast("Nama Sudah Terpakai!"); stat("Nama Sudah Terpakai! Pilih nama lain."); }
       if (c.name && !cleanName($("lname").value) && !saved) { rname = c.name; store.set("chess_rname", rname); $("lname").placeholder = rname; }
       if (c.go) go(c.go); renderLobby(); return;
     }
@@ -1226,8 +1335,22 @@ function bootLobby() {
   function go(gid) { location.replace(location.pathname + "?s=" + encodeURIComponent(gid) + "&db=" + encodeURIComponent(DB)); }
 
   document.querySelectorAll("#gSel .gt").forEach((b) => { b.onclick = () => { G = b.dataset.g; store.set("chess_g", G); stat(""); paintGame(); renderLobby(); }; });
-  $("modeP").onclick = () => { mode = "p"; $("modeP").classList.add("on"); $("modeB").classList.remove("on"); stat(""); saveName(); renderLobby(); };
-  $("modeB").onclick = () => { mode = "b"; $("modeB").classList.add("on"); $("modeP").classList.remove("on"); saveName(); stat(G === "mine" ? "Menyiapkan papan…" : "Menyiapkan game melawan Bot…"); if (!joined) hello(); sendReq({ t: "bot", g: G }).catch(() => stat("Gagal terhubung.")); renderLobby(); };
+  $("modeP").onclick = () => { $("eloBox").classList.add("hidden"); mode = "p"; $("modeP").classList.add("on"); $("modeB").classList.remove("on"); stat(""); saveName(); renderLobby(); };
+  const ELO_HINT = { 200: "Pemula sekali, sering salah langkah.", 400: "Pemula, masih banyak membiarkan bidak.", 800: "Pemain santai.", 1000: "Paham dasar taktik.", 1500: "Klub, jarang salah taktik pendek.", 2000: "Kuat, menghitung taktik dalam.", 2800: "Level Grandmaster. Berpikir paling lama." };
+  let elo = 1000; try { elo = Number(store.get("chess_elo")) || 1000; } catch {}
+  function paintElo() {
+    document.querySelectorAll("#eloChips .btn").forEach((b) => b.classList.toggle("on", Number(b.dataset.e) === elo));
+    $("eloHint").textContent = ELO_HINT[elo] || "";
+  }
+  document.querySelectorAll("#eloChips .btn").forEach((b) => (b.onclick = () => { elo = Number(b.dataset.e); store.set("chess_elo", String(elo)); paintElo(); }));
+  function startBot() {
+    saveName(); $("eloBox").classList.add("hidden");
+    stat(G === "mine" ? "Menyiapkan papan…" : "Menyiapkan game melawan Bot…"); if (!joined) hello();
+    sendReq({ t: "bot", g: G, ...(G === "chess" ? { elo } : {}) }).catch(() => stat("Gagal terhubung."));
+    renderLobby();
+  }
+  $("eloGo").onclick = startBot;
+  $("modeB").onclick = () => { mode = "b"; $("modeB").classList.add("on"); $("modeP").classList.remove("on"); if (G === "chess") { paintElo(); $("eloBox").classList.remove("hidden"); stat(""); return; } startBot(); };
   $("lcancel").onclick = () => { wait = false; stat(""); sendReq({ t: "cancel" }).catch(() => {}); renderLobby(); };
   $("ofYes").onclick = () => { $("offerOv").classList.remove("on"); sendReq({ t: "accept" }).catch(() => {}); stat("Memulai game…"); };
   $("ofNo").onclick = () => { $("offerOv").classList.remove("on"); sendReq({ t: "decline" }).catch(() => {}); };
